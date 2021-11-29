@@ -32,6 +32,7 @@ Many tools are available.
 - RegExp Tester
 - Text Comparer
 - Json <> Yaml converter
+- PNG/JPEG image compressor
 - String Utilities
 - URL Encoder/Decoder
 - HTML Encoder/Decoder
@@ -48,6 +49,11 @@ Many tools are available.
 
 ### Microsoft Store
 - Search for DevToys in the Microsoft Store App or click [here](https://www.microsoft.com/store/apps/9PGCV4V3BK4W)
+
+### WinGet
+- Open a PowerShell command prompt.
+- Type `winget search DevToys` to search and see details about DevToys.
+- Type `winget install DevToys` to install the app.
 
 ### Manual
 
@@ -74,6 +80,7 @@ Here is the list of tool name you can use:
 - `jsonformat` Json Formatter
 - `jsonyaml` - Json <> Yaml
 - `jwt` - JWT Decoder
+- `imgcomp` - PNG/JPEG compressor
 - `markdown` - Markdown Preview
 - `regex` - Regular Expression Tester
 - `string` - String Utilities
@@ -84,7 +91,7 @@ Here is the list of tool name you can use:
 
 ## Please, avoid selling this app as yours
 
-I don't care if you copy the source code to use in your project, but please avoid simply changing the name and selling as your work. 
+I don't care if you copy the source code to use in your project, but please avoid simply changing the name and selling as your work without further change. 
 That's not why I'm sharing the source code, at all.
 
 ## Contribute
