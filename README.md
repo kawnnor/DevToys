@@ -26,10 +26,11 @@ DevToys helps in everyday tasks like formatting JSON, comparing text, testing Re
 Many tools are available.
 - Base 64 Encoder/Decoder
 - Hash Generator (MD5, SHA1, SHA256, SHA512)
-- Guid Generator
+- UUID Generator
 - JWT Decoder
 - Json Formatter
 - RegExp Tester
+- Number Base Converter
 - Text Comparer
 - Json <> Yaml converter
 - PNG/JPEG image compressor
@@ -76,13 +77,14 @@ For example, `start devtoys:?tool=jsonyaml` will open DevToys and start on the `
 Here is the list of tool name you can use:
 - `base64` - Base64 Encoder/Decoder
 - `hash` - Hash Generator
-- `guid` - Guid Generator
+- `uuid` - UUID Generator
 - `jsonformat` Json Formatter
 - `jsonyaml` - Json <> Yaml
 - `jwt` - JWT Decoder
 - `imgcomp` - PNG/JPEG compressor
 - `markdown` - Markdown Preview
 - `regex` - Regular Expression Tester
+- `baseconverter` - Number Base Converter
 - `string` - String Utilities
 - `url` - URL Encoder/Decoder
 - `html` - HTML Encoder/Decoder

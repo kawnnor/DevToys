@@ -22,8 +22,13 @@
       <Link>Properties\SharedAssemblyInfo.cs</Link>
     </Compile>
     <Compile Include="Api\Core\OOP\IAppService.cs" />
+    <Compile Include="Api\Tools\ParentAttribute.cs" />
     <Compile Include="Core\OOP\AppService.cs" />
     <Compile Include="Core\Threading\AsyncLazy.cs" />
+    <Compile Include="Helpers\NumberBaseHelper.cs" />
+    <Compile Include="Models\NoResultFoundMockToolProvider.cs" />
+    <Compile Include="Models\Radix.cs" />
+    <Compile Include="Models\NumberBaseFormat.cs" />
     <Compile Include="UI\Converters\BooleanToDoubleConverter.cs" />
     <Compile Include="UI\Converters\BooleanToIntegerConverter.cs" />
     <Compile Include="ViewModels\Tools\HtmlEncoderDecoder\HtmlEncoderDecoderToolProvider.cs" />
@@ -31,6 +36,11 @@
     <Compile Include="ViewModels\Tools\PngJpgCompressor\ImageCompressionWorkItem.cs" />
     <Compile Include="ViewModels\Tools\PngJpgCompressor\PngJpgCompressorToolProvider.cs" />
     <Compile Include="ViewModels\Tools\PngJpgCompressor\PngJpgCompressorToolViewModel.cs" />
+    <Compile Include="ViewModels\Tools\Text\Formatters\FormattersGroupToolProvider.cs" />
+    <Compile Include="ViewModels\Tools\Text\TextGroupToolProvider.cs" />
+    <Compile Include="Views\Tools\GuidGenerator\GuidGeneratorToolPage.xaml.cs">
+      <DependentUpon>GuidGeneratorToolPage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="Views\Tools\HtmlEncoderDecoder\HtmlEncoderDecoderToolPage.xaml.cs">
       <DependentUpon>HtmlEncoderDecoderToolPage.xaml</DependentUpon>
     </Compile>
@@ -196,8 +206,9 @@
     <Compile Include="Api\Tools\ToolProviderMetadata.cs" />
     <Compile Include="Core\AssetsHelper.cs" />
     <Compile Include="Core\Clipboard.cs" />
-    <Compile Include="Core\Collections\OrderedObservableCollection.cs" />
+    <Compile Include="Core\Collections\ExtendedObservableCollection.cs" />
     <Compile Include="Core\Constants.cs" />
+    <Compile Include="ViewModels\Tools\NumberBaseConverter\NumberBaseFormatter.cs" />
     <Compile Include="Core\Logger.cs" />
     <Compile Include="Core\MarketingService.cs" />
     <Compile Include="Core\Navigation\WindowManager.cs" />
@@ -224,6 +235,8 @@
     <Compile Include="UI\Converters\NullToVisibilityConverter.cs" />
     <Compile Include="Helpers\JsonHelper.cs" />
     <Compile Include="Helpers\YamlHelper.cs" />
+    <Compile Include="ViewModels\Tools\NumberBaseConverter\NumberBaseConverterToolProvider.cs" />
+    <Compile Include="ViewModels\Tools\NumberBaseConverter\NumberBaseConverterToolViewModel.cs" />
     <Compile Include="ViewModels\Tools\GuidGenerator\GuidGeneratorToolProvider.cs" />
     <Compile Include="ViewModels\Tools\GuidGenerator\GuidGeneratorToolViewModel.cs" />
     <Compile Include="ViewModels\Tools\JsonYaml\JsonYamlToolProvider.cs" />
@@ -243,7 +256,6 @@
       <DesignTime>True</DesignTime>
     </Compile>
     <Compile Include="Messages\NavigateToToolMessage.cs" />
-    <Compile Include="Models\MatchedToolProviderViewData.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
@@ -280,12 +292,12 @@
     <Compile Include="ViewModels\Tools\Base64EncoderDecoder\Base64EncoderDecoderToolViewModel.cs" />
     <Compile Include="ViewModels\Tools\HashGenerator\HashGeneratorToolProvider.cs" />
     <Compile Include="ViewModels\Tools\HashGenerator\HashGeneratorToolViewModel.cs" />
-    <Compile Include="ViewModels\Tools\JsonFormatter\JsonFormatterToolProvider.cs" />
-    <Compile Include="ViewModels\Tools\JsonFormatter\JsonFormatterToolViewModel.cs" />
+    <Compile Include="ViewModels\Tools\Text\Formatters\JsonFormatter\JsonFormatterToolProvider.cs" />
+    <Compile Include="ViewModels\Tools\Text\Formatters\JsonFormatter\JsonFormatterToolViewModel.cs" />
     <Compile Include="ViewModels\Tools\RegEx\RegExToolProvider.cs" />
     <Compile Include="ViewModels\Tools\RegEx\RegExToolViewModel.cs" />
-    <Compile Include="ViewModels\Tools\TextDiff\TextDiffToolProvider.cs" />
-    <Compile Include="ViewModels\Tools\TextDiff\TextDiffToolViewModel.cs" />
+    <Compile Include="ViewModels\Tools\Text\TextDiff\TextDiffToolProvider.cs" />
+    <Compile Include="ViewModels\Tools\Text\TextDiff\TextDiffToolViewModel.cs" />
     <Compile Include="ViewModels\Tools\UrlEncoderDecoder\UrlEncoderDecoderToolProvider.cs" />
     <Compile Include="ViewModels\Tools\UrlEncoderDecoder\UrlEncoderDecoderToolViewModel.cs" />
     <Compile Include="Views\MainPage.xaml.cs">
@@ -294,8 +306,8 @@
     <Compile Include="Views\Tools\Base64EncoderDecoder\Base64EncoderDecoderToolPage.xaml.cs">
       <DependentUpon>Base64EncoderDecoderToolPage.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Views\Tools\GuidGenerator\GuidGeneratorToolPage.xaml.cs">
-      <DependentUpon>GuidGeneratorToolPage.xaml</DependentUpon>
+    <Compile Include="Views\Tools\NumberBaseConverter\NumberBaseConverterToolPage.xaml.cs">
+      <DependentUpon>NumberBaseConverterToolPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Views\Tools\HashGenerator\HashGeneratorToolPage.xaml.cs">
       <DependentUpon>HashGeneratorToolPage.xaml</DependentUpon>
@@ -354,7 +366,7 @@
     <AppxManifest Include="Package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
-    <PRIResource Include="Strings\en-US\PngJpgCompressor.resw" />
+    <PRIResource Include="Strings\*\*.resw" />
     <Page Include="Themes\Custom.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -394,6 +406,10 @@
     <Page Include="Views\Tools\GuidGenerator\GuidGeneratorToolPage.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Views\Tools\NumberBaseConverter\NumberBaseConverterToolPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
     </Page>
     <Page Include="Views\Tools\HashGenerator\HashGeneratorToolPage.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -447,7 +463,6 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <PRIResource Include="Strings\*\*.resw" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="GitInfo" Version="$(Nuget_GitInfo)" />
@@ -481,6 +496,7 @@
       <Name>Windows Desktop Extensions for the UWP</Name>
     </SDKReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

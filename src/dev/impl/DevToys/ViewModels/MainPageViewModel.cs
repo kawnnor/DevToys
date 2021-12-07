@@ -42,11 +42,10 @@ namespace DevToys.ViewModels
         private readonly ISettingsProvider _settingsProvider;
         private readonly INotificationService _notificationService;
         private readonly IMarketingService _marketingService;
-        private readonly List<MatchedToolProviderViewData> _allToolsMenuitems = new();
         private readonly DisposableSempahore _sempahore = new();
-        private readonly Lazy<Task> _firstUpdateMenuTask;
+        private readonly Task _menuInitializationTask;
 
-        private MatchedToolProviderViewData? _selectedItem;
+        private MatchedToolProvider? _selectedItem;
         private NavigationViewDisplayMode _navigationViewDisplayMode;
         private bool _isNavigationViewPaneOpened;
         private string? _searchQuery;
@@ -63,17 +62,17 @@ namespace DevToys.ViewModels
         /// <summary>
         /// Items at the top of the NavigationView.
         /// </summary>
-        internal OrderedObservableCollection<MatchedToolProviderViewData> ToolsMenuItems { get; } = new();
+        internal ExtendedObservableCollection<MatchedToolProvider> ToolsMenuItems { get; } = new();
 
         /// <summary>
         /// Items at the bottom of the NavigationView. That includes Settings.
         /// </summary>
-        internal OrderedObservableCollection<MatchedToolProviderViewData> FooterMenuItems { get; } = new();
+        internal ExtendedObservableCollection<MatchedToolProvider> FooterMenuItems { get; } = new();
 
         /// <summary>
         /// Gets or sets the selected menu item in the NavitationView.
         /// </summary>
-        internal MatchedToolProviderViewData? SelectedMenuItem
+        internal MatchedToolProvider? SelectedMenuItem
         {
             get => _selectedItem;
             set => SetSelectedMenuItem(value, _clipboardContent);
@@ -118,10 +117,14 @@ namespace DevToys.ViewModels
                 if (_searchQuery != value)
                 {
                     SetProperty(ref _searchQuery, value);
-                    UpdateMenuAsync(value).Forget();
                 }
             }
         }
+
+        /// <summary>
+        /// Gets or sets the list of items to displayed in the Search Box after a search.
+        /// </summary>
+        internal ExtendedObservableCollection<MatchedToolProvider> SearchResults { get; } = new();
 
         /// <summary>
         /// Gets whether the window is in Compact Overlay mode or not.
@@ -151,7 +154,6 @@ namespace DevToys.ViewModels
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
                 SetProperty(ref _navigationViewDisplayMode, value);
-                OnPropertyChanged(nameof(ActualNavigationViewDisplayMode));
             }
         }
 
@@ -165,25 +167,6 @@ namespace DevToys.ViewModels
             {
                 ThreadHelper.ThrowIfNotOnUIThread();
                 SetProperty(ref _isNavigationViewPaneOpened, value);
-                OnPropertyChanged(nameof(ActualNavigationViewDisplayMode));
-            }
-        }
-
-        /// <summary>
-        /// Gets the actual <see cref="NavigationViewDisplayMode"/> to apply to the navigation view menu items.
-        /// </summary>
-        public NavigationViewDisplayMode ActualNavigationViewDisplayMode
-        {
-            get
-            {
-                if (IsNavigationViewPaneOpened)
-                {
-                    return NavigationViewDisplayMode.Expanded;
-                }
-                else
-                {
-                    return NavigationViewDisplayMode;
-                }
             }
         }
 
@@ -207,8 +190,10 @@ namespace DevToys.ViewModels
 
             OpenToolInNewWindowCommand = new AsyncRelayCommand<ToolProviderMetadata>(ExecuteOpenToolInNewWindowCommandAsync);
             ChangeViewModeCommand = new AsyncRelayCommand<ApplicationViewMode>(ExecuteChangeViewModeCommandAsync);
+            SearchBoxTextChangedCommand = new AsyncRelayCommand<Windows.UI.Xaml.Controls.AutoSuggestBoxTextChangedEventArgs>(ExecuteSearchBoxTextChangedCommandAsync);
+            SearchBoxQuerySubmittedCommand = new RelayCommand<Windows.UI.Xaml.Controls.AutoSuggestBoxQuerySubmittedEventArgs>(ExecuteSearchBoxQuerySubmittedCommand);
 
-            _firstUpdateMenuTask = new Lazy<Task>(() => UpdateMenuAsync(searchQuery: string.Empty));
+            _menuInitializationTask = BuildMenuAsync();
 
             Window.Current.Activated += Window_Activated;
 
@@ -250,15 +235,89 @@ namespace DevToys.ViewModels
 
         #endregion
 
+        #region SearchBoxTextChangedCommand
+
+        public IAsyncRelayCommand<Windows.UI.Xaml.Controls.AutoSuggestBoxTextChangedEventArgs> SearchBoxTextChangedCommand { get; }
+
+        private async Task ExecuteSearchBoxTextChangedCommandAsync(Windows.UI.Xaml.Controls.AutoSuggestBoxTextChangedEventArgs? parameters)
+        {
+            Arguments.NotNull(parameters, nameof(parameters));
+
+            await TaskScheduler.Default;
+
+            MatchedToolProvider[]? searchResult = null;
+
+            if (parameters!.Reason == Windows.UI.Xaml.Controls.AutoSuggestionBoxTextChangeReason.UserInput)
+            {
+                string? searchQuery = SearchQuery;
+                if (!string.IsNullOrEmpty(searchQuery))
+                {
+                    IEnumerable<MatchedToolProvider> matchedTools
+                        = await _toolProviderFactory.SearchToolsAsync(searchQuery!).ConfigureAwait(false);
+
+                    if (matchedTools.Any())
+                    {
+                        searchResult = matchedTools.ToArray();
+                    }
+                    else
+                    {
+                        searchResult = new[]
+                        {
+                            new MatchedToolProvider(new ToolProviderMetadata(), new NoResultFoundMockToolProvider())
+                        };
+                    }
+                }
+            }
+
+            await ThreadHelper.RunOnUIThreadAsync(() =>
+            {
+                if (searchResult is null)
+                {
+                    SearchResults.Clear();
+                }
+                else
+                {
+                    SearchResults.Update(searchResult);
+                }
+            });
+        }
+
+        #endregion
+
+        #region SearchBoxQuerySubmittedCommand
+
+        public IRelayCommand<Windows.UI.Xaml.Controls.AutoSuggestBoxQuerySubmittedEventArgs> SearchBoxQuerySubmittedCommand { get; }
+
+        private void ExecuteSearchBoxQuerySubmittedCommand(Windows.UI.Xaml.Controls.AutoSuggestBoxQuerySubmittedEventArgs? parameters)
+        {
+            Arguments.NotNull(parameters, nameof(parameters));
+
+            if (string.IsNullOrEmpty(parameters!.QueryText))
+            {
+                // Nothing has been search. Do nothing.
+                return;
+            }
+
+            if (parameters.ChosenSuggestion is null or NoResultFoundMockToolProvider)
+            {
+                // TODO: Show a page indicating "No results match your search".
+                return;
+            }
+
+            SetSelectedMenuItem((MatchedToolProvider)parameters.ChosenSuggestion!, clipboardContentData: null);
+        }
+
+        #endregion
+
         /// <summary>
         /// Invoked when the Page is loaded and becomes the current source of a parent Frame.
         /// </summary>
         internal async Task OnNavigatedToAsync(NavigationParameter parameters)
         {
-            // Make sure the menu items exist.
-            await _firstUpdateMenuTask.Value.ConfigureAwait(false);
+            // Make sure the menu is populated.
+            await _menuInitializationTask.ConfigureAwait(false);
 
-            MatchedToolProviderViewData? toolProviderViewDataToSelect = null;
+            MatchedToolProvider? toolProviderViewDataToSelect = null;
             if (!string.IsNullOrWhiteSpace(parameters.Query))
             {
                 NameValueCollection queryParameters = HttpUtility.ParseQueryString(parameters.Query!.ToLower(CultureInfo.CurrentCulture));
@@ -295,7 +354,7 @@ namespace DevToys.ViewModels
                 });
         }
 
-        private void SetSelectedMenuItem(MatchedToolProviderViewData? value, string? clipboardContentData)
+        private void SetSelectedMenuItem(MatchedToolProvider? value, string? clipboardContentData)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             if (_isUpdatingSelectedItem)
@@ -326,85 +385,26 @@ namespace DevToys.ViewModels
             _isUpdatingSelectedItem = false;
         }
 
-        private async Task UpdateMenuAsync(string? searchQuery)
+        private async Task BuildMenuAsync()
         {
             await TaskScheduler.Default;
 
             try
             {
-                var newToolsMenuitems = new Dictionary<MatchedToolProviderViewData, MatchSpan[]?>();
-                var footerMenuItems = new List<MatchedToolProviderViewData>();
-
-                using (await _sempahore.WaitAsync(CancellationToken.None).ConfigureAwait(false))
-                {
-                    bool firstTime = string.IsNullOrEmpty(searchQuery) && _allToolsMenuitems.Count == 0;
-
-                    foreach (MatchedToolProvider matchedToolProvider in _toolProviderFactory.GetTools(searchQuery))
-                    {
-                        MatchedToolProviderViewData item;
-                        MatchSpan[]? matchSpans = null;
-                        if (firstTime)
-                        {
-                            item
-                               = new MatchedToolProviderViewData(
-                                   matchedToolProvider.Metadata,
-                                   matchedToolProvider.ToolProvider,
-                                   matchedToolProvider.MatchedSpans);
-                            _allToolsMenuitems.Add(item);
-                        }
-                        else
-                        {
-                            item
-                                = _allToolsMenuitems.FirstOrDefault(
-                                    m => string.Equals(
-                                        m.Metadata.Name,
-                                        matchedToolProvider.Metadata.Name,
-                                        StringComparison.Ordinal));
-
-                            matchSpans = matchedToolProvider.MatchedSpans;
-                        }
-
-                        newToolsMenuitems[item] = matchSpans;
-                    }
-
-                    if (FooterMenuItems.Count == 0)
-                    {
-                        foreach (MatchedToolProvider matchedToolProvider in _toolProviderFactory.GetFooterTools())
-                        {
-                            footerMenuItems.Add(
-                                new MatchedToolProviderViewData(
-                                    matchedToolProvider.Metadata,
-                                    matchedToolProvider.ToolProvider,
-                                    matchedToolProvider.MatchedSpans));
-                        }
-                    }
-                }
+                IEnumerable<MatchedToolProvider> tools = await _toolProviderFactory.GetToolsTreeAsync().ConfigureAwait(false);
+                IEnumerable<MatchedToolProvider> footerTools = await _toolProviderFactory.GetFooterToolsAsync().ConfigureAwait(false);
 
                 await ThreadHelper.RunOnUIThreadAsync(
                     ThreadPriority.Low,
                     () =>
                     {
-                        MatchedToolProviderViewData? oldSelectedItem = SelectedMenuItem;
-                        ToolsMenuItems.Clear();
-                        SetSelectedMenuItem(null, null);
-
-                        foreach (KeyValuePair<MatchedToolProviderViewData, MatchSpan[]?> item in newToolsMenuitems)
-                        {
-                            if (item.Value is not null)
-                            {
-                                item.Key.MatchedSpans = item.Value;
-                            }
-                        }
-
-                        ToolsMenuItems.Update(newToolsMenuitems.Keys);
-                        footerMenuItems.ForEach(item => FooterMenuItems.Add(item));
-
-                        SetSelectedMenuItem(oldSelectedItem, null);
+                        ToolsMenuItems.AddRange(tools);
+                        FooterMenuItems.AddRange(footerTools);
                     });
             }
             catch (Exception ex)
             {
-                Logger.LogFault("Update main menu after a search", ex, $"Search query: {searchQuery}");
+                Logger.LogFault("Update main menu after a search", ex, string.Empty);
             }
         }
 
@@ -427,36 +427,41 @@ namespace DevToys.ViewModels
                 return;
             }
 
-            // Make sure the menu items exist.
-            await _firstUpdateMenuTask.Value.ConfigureAwait(false);
+            // Make sure the menu is populated.
+            await _menuInitializationTask.ConfigureAwait(false);
 
-            MatchedToolProviderViewData[] oldRecommendedTools = _allToolsMenuitems.Where(item => item.IsRecommended).ToArray();
+            IEnumerable<MatchedToolProvider> allTools = _toolProviderFactory.GetAllTools();
+
+            MatchedToolProvider[] oldRecommendedTools
+                = allTools
+                    .Where(item => item.IsRecommended)
+                    .ToArray(); // Make a copy so we can compare with a newer list once we computed recommended items.
 
             // Start check what tools can treat the clipboard content.
             var tasks = new List<Task>();
-            for (int i = 0; i < _allToolsMenuitems.Count; i++)
+            foreach (MatchedToolProvider tool in allTools)
             {
-                MatchedToolProviderViewData tool = _allToolsMenuitems[i];
+                MatchedToolProvider currentTool = tool;
                 tasks.Add(
                     Task.Run(async () =>
                     {
                         try
                         {
-                            await tool.UpdateIsRecommendedAsync(clipboardContent).ConfigureAwait(false);
+                            await currentTool.UpdateIsRecommendedAsync(clipboardContent).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
-                            Logger.LogFault("SmartDetection - Check if tool is recommended", ex, $"Tool : {tool.Metadata.Name}");
+                            Logger.LogFault("SmartDetection - Check if tool is recommended", ex, $"Tool : {currentTool.Metadata.Name}");
                         }
                     }));
             }
 
             await Task.WhenAll(tasks).ConfigureAwait(false);
 
-            MatchedToolProviderViewData[] newRecommendedTools
-                = _allToolsMenuitems
-                .Where(item => item.IsRecommended && !item.Metadata.IsFooterItem)
-                .ToArray();
+            MatchedToolProvider[] newRecommendedTools
+                = allTools
+                    .Where(item => item.IsRecommended)
+                    .ToArray();
 
             _clipboardContent = clipboardContent;
             if (oldRecommendedTools.SequenceEqual(newRecommendedTools))
@@ -478,7 +483,7 @@ namespace DevToys.ViewModels
             using (await _sempahore.WaitAsync(CancellationToken.None).ConfigureAwait(false))
             {
                 if (newRecommendedTools.Length == 1
-                    && ToolsMenuItems.Contains(newRecommendedTools[0]))
+                    && IsToolDisplayedInMenu(ToolsMenuItems, newRecommendedTools[0]))
                 {
                     // One unique tool is recommended.
                     // The recommended tool is displayed in the top menu.
@@ -495,6 +500,27 @@ namespace DevToys.ViewModels
                         });
                 }
             }
+        }
+
+        private bool IsToolDisplayedInMenu(IEnumerable<MatchedToolProvider> tools, MatchedToolProvider matchedToolProvider)
+        {
+            Arguments.NotNull(tools, nameof(tools));
+            Arguments.NotNull(matchedToolProvider, nameof(matchedToolProvider));
+
+            if (tools.Contains(matchedToolProvider))
+            {
+                return true;
+            }
+
+            foreach (MatchedToolProvider tool in tools)
+            {
+                if (IsToolDisplayedInMenu(tool.ChildrenTools, matchedToolProvider))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private async Task ShowReleaseNoteAsync()
